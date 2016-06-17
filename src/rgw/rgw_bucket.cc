@@ -1591,7 +1591,7 @@ void RGWDataChangesLog::update_renewed(rgw_bucket_shard& bs, utime_t& expiration
 }
 
 int RGWDataChangesLog::add_entry(rgw_bucket& bucket, int shard_id) {
-  if (!store->need_to_log_data())
+  if (!store->need_to_log_data()) 
     return 0;
 
   rgw_bucket_shard bs(bucket, shard_id);

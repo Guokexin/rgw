@@ -1463,7 +1463,7 @@ class RGWBgtManager : public Thread {
   friend class RGWBgtWorker;
   friend class RGWBgtScheduler;
   private:
-    RGWBgtManager( ):m_manager_inst_obj(NULL),m_merger_inst_obj(NULL),app_num(0),worker_num(0),m_store(NULL),m_cct(NULL),archive_num(0),stopping(true)
+    RGWBgtManager( ):m_manager_inst_obj(NULL),m_merger_inst_obj(NULL),app_num(0),worker_num(0),m_store(NULL),m_cct(NULL),archive_num(0),stopping(true),b_reload_workers(false)
      { 
        
      };
@@ -1557,6 +1557,8 @@ class RGWBgtManager : public Thread {
     bool stopping; 
     Cond cond;
 
+  public:
+    bool b_reload_workers;
 };
 
 

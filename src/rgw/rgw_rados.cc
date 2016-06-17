@@ -1200,6 +1200,8 @@ int RGWPutObjProcessor_Atomic::handle_data(bufferlist& bl, off_t ofs, MD5 *hash,
     }
   }
 
+  
+
   uint64_t max_write_size = MIN(max_chunk_size, (uint64_t)next_part_ofs - data_ofs);
 
   pending_data_bl.claim_append(bl);
@@ -1583,7 +1585,7 @@ void RGWRados::rgw_show_op_stat(Formatter * f)
 int RGWRados::write_bgt_change_log(rgw_bucket& bucket, rgw_obj& obj, uint64_t obj_len)
 {
   /*Begin added by Lujiafu for suyanyuan test*/
-  return 0;
+  //return 0;
   /*End add*/
   
   if (obj_len >= cct->_conf->rgw_bgt_merged_src_obj_max_size)
@@ -1633,7 +1635,7 @@ int RGWRados::write_bgt_change_log(rgw_bucket& bucket, rgw_obj& obj, uint64_t ob
     r = scheduler->write_change_log(log_entry);    
   }
   else {
-    ldout(cct , 20) << "scheduler == null" << dendl;
+    ldout(cct , 20) << "scheduler == null, index_pool " << bucket.index_pool << dendl;
   }
   if (r < 0)
   {
@@ -2682,7 +2684,7 @@ int RGWRados::init_complete()
   //Begin added by guokexin
   RGWBgtManager* manager = RGWBgtManager::instance();
   if(manager) {
-    ldout(cct, 0) << "init RGWBgtManager " << dendl;
+    ldout(cct , 0) << "init RGWBgtManager" << dendl;
     manager->init(this, cct );
   }
   //End added
@@ -3454,13 +3456,16 @@ int RGWRados::objexp_hint_add(const utime_t& delete_at,
 {
   const string keyext = objexp_hint_get_keyext(bucket_name,
           bucket_id, obj_key);
+
   objexp_hint_entry he = {
       .bucket_name = bucket_name,
       .bucket_id = bucket_id,
       .obj_key = obj_key,
       .exp_time = delete_at };
+
   bufferlist hebl;
   ::encode(he, hebl);
+
   ObjectWriteOperation op;
   cls_timeindex_add(op, delete_at, keyext, hebl);
 
@@ -3688,6 +3693,8 @@ int RGWRados::Bucket::List::list_objects(int max, vector<RGWObjEnt> *result,
       rgw_obj_key key = obj;
       string instance;
       string ns;
+      //guokexin list obj
+      ldout(cct , 20) << key.name << dendl;
 
       bool valid = rgw_obj::parse_raw_oid(obj.name, &obj.name, &instance, &ns);
       if (!valid) {
@@ -4574,7 +4581,7 @@ int RGWRados::Object::Write::write_meta(uint64_t size,
        xattrs, so just remove the object */
     op.write_full(*meta.data);
   }
-
+  //==================================================
   string etag;
   string content_type;
   bufferlist acl_bl;
@@ -4638,11 +4645,12 @@ int RGWRados::Object::Write::write_meta(uint64_t size,
   if (versioned_op) {
     index_op.set_bilog_flags(RGW_BILOG_FLAG_VERSIONED_OP);
   }
-
+  
   r = index_op.prepare(CLS_RGW_OP_ADD);
   if (r < 0)
     return r;
 
+  
   r = ref.ioctx.operate(ref.oid, &op);
   if (r < 0) { /* we can expect to get -ECANCELED if object was replaced under,
                 or -ENOENT if was removed, or -EEXIST if it did not exist
@@ -4679,17 +4687,36 @@ int RGWRados::Object::Write::write_meta(uint64_t size,
     }
   }
 
-  if (meta.delete_at > 0) {
+  
+ /*
+ {
+    time_t cur_time = ceph_clock_now(0).sec();
+    meta.delete_at = cur_time + 10;
     rgw_obj_key obj_key;
     obj.get_index_key(&obj_key);
 
-    r = store->objexp_hint_add(utime_t(meta.delete_at, 0), bucket.name, bucket.bucket_id, obj_key);
-    if (r < 0) {
-      ldout(store->ctx(), 0) << "ERROR: objexp_hint_add() returned r=" << r << ", object will not get removed" << dendl;
-      /* ignoring error, nothing we can do at this point */
-    }
+    ldout(store->ctx() , 0) << "objexp_hint_add  " << meta.delete_at  << " "<< cur_time << dendl;
+    r = store->objexp_hint_add(utime_t( meta.delete_at, 0), bucket.name, bucket.bucket_id, obj_key);
   }
+*/
 
+ 
+     if (meta.delete_at > 0) {
+
+       //time_t cur_time = ceph_clock_now(0).sec();
+       //meta.delete_at = cur_time + 10;
+
+       rgw_obj_key obj_key;
+       obj.get_index_key(&obj_key);
+
+       //ldout(store->ctx() , 0) << "objexp_hint_add" << dendl;
+       r = store->objexp_hint_add(utime_t(meta.delete_at, 0), bucket.name, bucket.bucket_id, obj_key);
+       if (r < 0) {
+        ldout(store->ctx(), 0) << "ERROR: objexp_hint_add() returned r=" << r << ", object will not get removed" << dendl;
+// ignoring error, nothing we can do at this point 
+       }
+     }
+ 
   /* update quota cache */
   store->quota_handler->update_stats(meta.owner, bucket, (orig_exists ? 0 : 1), size, orig_size);
 
@@ -5386,7 +5413,6 @@ int RGWRados::copy_obj(RGWObjectCtx& obj_ctx,
 
   RGWRados::Object dest_op_target(this, dest_bucket_info, obj_ctx, dest_obj);
   RGWRados::Object::Write write_op(&dest_op_target);
-
   string tag;
 
   if (ptag) {
@@ -6933,6 +6959,7 @@ int RGWRados::Bucket::UpdateIndex::prepare(RGWModifyOp op)
       append_rand_alpha(store->ctx(), optag, optag, 32);
     }
   }
+  //ldout(store->ctx(), 0) << "optags "<< optag << dendl;
   ret = store->cls_obj_prepare_op(*bs, op, optag, obj, bilog_flags);
 
   return ret;
@@ -7647,29 +7674,27 @@ void RGWRados::get_obj_aio_completion_cb(completion_t c, void *arg)
       goto done;
     }
 
-  if (d->is_cancelled()) {
-    goto done;
-  }
+    if (d->is_cancelled()) {
+      goto done;
+    }
 
     d->data_lock.Lock();
     /* Begin added by hechuang */
-    //if (d->is_compressed()) {
     if (d->decompress_info_map.find(ofs) != d->decompress_info_map.end()) {
-    //    ldout(cct, 0) << "2  in  cb" << dendl;
       r = d->get_complete_io_to_decompress(ofs, bl_list);
       if (r < 0) {
         goto done_unlock;
       }
-    
-    }else {                  /* End added */
+    }
+    else {                  /* End added */
 
       r = d->get_complete_ios(ofs, bl_list);
       if (r < 0) {
         goto done_unlock;
       }
-	}  
+	  }  
 
-  d->read_list.splice(d->read_list.end(), bl_list);
+    d->read_list.splice(d->read_list.end(), bl_list);
 
 done_unlock:
   d->data_lock.Unlock();
@@ -9062,6 +9087,7 @@ int RGWRados::raw_obj_stat(rgw_obj& obj, uint64_t *psize, time_t *pmtime, uint64
     op.read(0, cct->_conf->rgw_max_chunk_size, first_chunk, NULL);
   }
   bufferlist outbl;
+  //ldout(cct , 0) << "ioctx.operate ...." << dendl; 
   r = ref.ioctx.operate(ref.oid, &op, &outbl);
 
   if (epoch) {

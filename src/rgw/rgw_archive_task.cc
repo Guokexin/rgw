@@ -25,9 +25,29 @@ void ArchiveTask::start(){
 }
 
 void ArchiveTask::stop(){
-  sem_destroy(&sem_full);
-  task_archive_stop = true;
-  join();
+
+
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 1" << dendl;
+    sem_destroy(&sem_full);
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 2" << dendl;
+    task_archive_stop = true;
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 3" << dendl;
+    task_archive_lock.Lock();
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 4" << dendl;
+    task_type = 0;
+    cond.Signal();
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 5" << dendl;
+    task_archive_lock.Unlock();
+    ldout(worker->m_cct , 5) << "ArchiveTask::stop 6" << dendl;
+    join();
+
+
+ /*
+    ldout(m_cct , 0) << "ArchiveTask Stop" << dendl;
+    sem_destroy(&sem_full);
+    task_archive_stop = true;
+    join();
+ */
 }
 
 void ArchiveTask::dispatch_task(int _type)
@@ -51,6 +71,10 @@ void *ArchiveTask::task_thread_entry(){
     task_archive_lock.Lock();
     cond.Wait(task_archive_lock);
     task_archive_lock.Unlock();
+
+    if(task_type == 0) {
+       break;
+    }
 
     queue_size = worker->sfm_index.size();
     ldout(this->worker->m_cct, 0) << "=========start an task, total items:" << queue_size << dendl;
@@ -176,6 +200,7 @@ void *ArchiveTask::task_thread_entry(){
     ldout(this->worker->m_cct, 0) << "=========task end========" << dendl;
   } //while
 
+  ldout(this->worker->m_cct , 0) << "archive_task thread exit" << dendl;
   return 0;
 }
 

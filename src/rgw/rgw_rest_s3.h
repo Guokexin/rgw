@@ -83,6 +83,43 @@ public:
   void send_response();
 };
 
+
+//begin added by guokexin
+class RGWGetBucketLifeCycle_ObjStore_S3 : public RGWGetBucketLifeCycle {
+public:
+  RGWGetBucketLifeCycle_ObjStore_S3() {}
+  ~RGWGetBucketLifeCycle_ObjStore_S3() {}
+
+  void send_response();
+};
+//end added
+
+
+//begin added by guokexin 20160606
+class RGWSetBucketLifeCycle_ObjStore_S3 : public RGWSetBucketLifeCycle {
+public:
+  RGWSetBucketLifeCycle_ObjStore_S3() {}
+  ~RGWSetBucketLifeCycle_ObjStore_S3() {}
+
+  int get_params();
+  void send_response();
+};
+//end added
+
+//begin added by guokexin 20160606
+class RGWDelBucketLifeCycle_ObjStore_S3 : public RGWDelBucketLifeCycle {
+public:
+  RGWDelBucketLifeCycle_ObjStore_S3() {}
+  ~RGWDelBucketLifeCycle_ObjStore_S3() {}
+
+  int get_params();
+  void send_response();
+};
+//end added
+
+
+
+
 class RGWStatBucket_ObjStore_S3 : public RGWStatBucket_ObjStore {
 public:
   RGWStatBucket_ObjStore_S3() {}

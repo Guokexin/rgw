@@ -60,6 +60,11 @@ enum RGWOpType {
   RGW_OP_LIST_MULTIPART,
   RGW_OP_LIST_BUCKET_MULTIPARTS,
   RGW_OP_DELETE_MULTI_OBJ,
+  //added by guokexin 20160609 
+  RGW_OP_SET_BUCKET_LIFECYCLE,
+  RGW_OP_GET_BUCKET_LIFECYCLE,
+  RGW_OP_DEL_BUCKET_LIFECYCLE,
+  //end added
 };
 
 /**
@@ -135,6 +140,9 @@ protected:
   rgw_obj obj;
   utime_t gc_invalidate_time;
 
+  //begin added by guokexin  20160609
+  time_t delete_at;
+  //end added
   int init_common();
 public:
   RGWGetObj() {
@@ -155,6 +163,9 @@ public:
     get_data = false;
     partial_content = false;
     ret = 0;
+    //added by guokexin 20160609
+    delete_at = 0;
+    //end added
  }
 
   virtual bool prefetch_data() { return get_data; }
@@ -330,6 +341,75 @@ public:
   virtual RGWOpType get_type() { return RGW_OP_SET_BUCKET_VERSIONING; }
   virtual uint32_t op_mask() { return RGW_OP_TYPE_WRITE; }
 };
+
+//begin added by guokexin 20160606
+class RGWSetBucketLifeCycle : public RGWOp {
+protected:
+  bool enable_lifecycle;
+  int ret;
+  std::string days;
+public:
+  RGWSetBucketLifeCycle() : enable_lifecycle(false), ret(0) {}
+
+  int verify_permission();
+  void pre_exec();
+  void execute();
+
+  virtual int get_params() { return 0; }
+
+  virtual void send_response() = 0;
+  virtual const string name() { return "set_bucket_lifecycle"; }
+  virtual RGWOpType get_type() { return RGW_OP_SET_BUCKET_LIFECYCLE; }
+  virtual uint32_t op_mask() { return RGW_OP_TYPE_WRITE; }
+};
+//end added
+
+//begin added by guokexin 20160607
+class RGWGetBucketLifeCycle : public RGWOp {
+protected:
+  bool versioned;
+  bool versioning_enabled;
+public:
+  std::string days;
+public:
+  RGWGetBucketLifeCycle() : versioned(false), versioning_enabled(false) , days("") {}
+
+  int verify_permission();
+  void pre_exec();
+  void execute();
+
+  virtual void send_response() = 0;
+  virtual const string name() { return "get_bucket_lifecycle"; }
+  virtual RGWOpType get_type() { return RGW_OP_GET_BUCKET_LIFECYCLE; }
+  virtual uint32_t op_mask() { return RGW_OP_TYPE_READ; }
+};
+//end added
+
+
+
+
+//begin added by guokexin 20160606
+class RGWDelBucketLifeCycle : public RGWOp {
+protected:
+  bool enable_lifecycle;
+  int ret;
+  std::string days;
+public:
+  RGWDelBucketLifeCycle() : enable_lifecycle(false), ret(0) {}
+
+  int verify_permission();
+  void pre_exec();
+  void execute();
+
+  virtual int get_params() { return 0; }
+
+  virtual void send_response() = 0;
+  virtual const string name() { return "del_bucket_lifecycle"; }
+  virtual RGWOpType get_type() { return RGW_OP_DEL_BUCKET_LIFECYCLE; }
+  virtual uint32_t op_mask() { return RGW_OP_TYPE_WRITE; }
+};
+//end added
+
 
 class RGWStatBucket : public RGWOp {
 protected:

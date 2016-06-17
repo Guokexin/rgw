@@ -544,6 +544,7 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
 
   dout(1) << "====== starting new request req=" << hex << req << dec << " =====" << dendl;
   perfcounter->inc(l_rgw_req);
+  //dout(0) << "perfcounter req counter " << perfcounter->get(l_rgw_req) << dendl;
 
   RGWEnv& rgw_env = client_io->get_env();
 
@@ -569,6 +570,7 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
     goto done;
   }
 
+  //dout(0) << "handler = " << typeid(*handler).name() << dendl;
   should_log = mgr->get_logging();
 
   req->log(s, "getting op");
@@ -577,12 +579,16 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
     abort_early(s, NULL, -ERR_METHOD_NOT_ALLOWED);
     goto done;
   }
+
+
+  //dout(0) << "op = " << typeid(*op).name() << dendl;
+
   req->op = op;
 
   req->log(s, "authorizing");
   ret = handler->authorize();
   if (ret < 0) {
-    dout(10) << "failed to authorize request" << dendl;
+    dout(0) << "failed to authorize request" << dendl;
     abort_early(s, op, ret);
     goto done;
   }
@@ -592,12 +598,14 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
     abort_early(s, op, -ERR_USER_SUSPENDED);
     goto done;
   }
+
   req->log(s, "reading permissions");
   ret = handler->read_permissions(op);
   if (ret < 0) {
     abort_early(s, op, ret);
     goto done;
   }
+
 
   req->log(s, "init op");
   ret = op->init_processing();
@@ -606,12 +614,14 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
     goto done;
   }
 
+
   req->log(s, "verifying op mask");
   ret = op->verify_op_mask();
   if (ret < 0) {
     abort_early(s, op, ret);
     goto done;
   }
+
 
   req->log(s, "verifying op permissions");
   ret = op->verify_permission();
@@ -624,7 +634,7 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
     }
   }
 
-  req->log(s, "verifying op params");
+  req->log(s, "verifying params");
   ret = op->verify_params();
   if (ret < 0) {
     abort_early(s, op, ret);
@@ -708,6 +718,8 @@ void RGWLoadGenProcess::handle_request(RGWRequest *r)
 
 
 static int civetweb_callback(struct mg_connection *conn) {
+  
+  //dout(0) << "civetweb_callback" << dendl;
   struct mg_request_info *req_info = mg_get_request_info(conn);
   RGWProcessEnv *pe = static_cast<RGWProcessEnv *>(req_info->user_data);
   RGWRados *store = pe->store;

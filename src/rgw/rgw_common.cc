@@ -618,6 +618,9 @@ int RGWHTTPArgs::parse()
           (name.compare("versionId") == 0) ||
           (name.compare("versions") == 0) ||
           (name.compare("versioning") == 0) ||
+          //begin added by guokexin
+          (name.compare("lifecycle") == 0) ||
+          //end added
           (name.compare("torrent") == 0)) {
         sub_resources[name] = val;
       } else if (name[0] == 'r') { // root of all evil

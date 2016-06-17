@@ -124,6 +124,7 @@ int RGWOrphanStore::init()
 
 int RGWOrphanStore::store_entries(const string& oid, const map<string, bufferlist>& entries)
 {
+  ldout(store->ctx() , 0) <<"rgw_orphan.cc : 127" <<dendl;
   librados::ObjectWriteOperation op;
   op.omap_set(entries);
   cout << "storing " << entries.size() << " entries at " << oid << std::endl;

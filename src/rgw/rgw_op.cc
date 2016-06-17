@@ -39,6 +39,8 @@ static string shadow_ns = RGW_OBJ_NS_SHADOW;
 #define MULTIPART_UPLOAD_ID_PREFIX_LEGACY "2/"
 #define MULTIPART_UPLOAD_ID_PREFIX "2~" // must contain a unique char that may not come up in gen_rand_alpha()
 
+static void encode_delete_at_attr(time_t delete_at, map<string, bufferlist>& attrs);
+
 class MultipartMetaFilter : public RGWAccessListFilter {
 public:
   MultipartMetaFilter() {}
@@ -378,9 +380,11 @@ static int rgw_build_policies(RGWRados *store, struct req_state *s, bool only_bu
     }
   }
 
+  
   if (!s->bucket_name_str.empty()) {
     s->bucket_exists = true;
     if (s->bucket_instance_id.empty()) {
+
       ret = store->get_bucket_info(obj_ctx, s->bucket_name_str, s->bucket_info, NULL, &s->bucket_attrs);
     } else {
       ret = store->get_bucket_instance_info(obj_ctx, s->bucket_instance_id, s->bucket_info, NULL, &s->bucket_attrs);
@@ -914,9 +918,16 @@ static bool object_is_expired(map<string, bufferlist>& attrs) {
       return false;
     }
 
+    
+    dout(0) << "delete_at  : "<< delete_at <<dendl;
+    
     if (delete_at <= ceph_clock_now(g_ceph_context)) {
       return true;
     }
+  }
+  else {
+
+    dout(0) << "no exist " << dendl;
   }
 
   return false;
@@ -955,7 +966,7 @@ void RGWGetObj::execute()
   
   if (s->merge_ref.bi_entry.meta.is_merged)
   {
-    ldout(s->cct, 10) << "redirect read data:" << ofs << "," << end << dendl;
+    ldout(s->cct, 0) << "redirect read data:" << ofs << "," << end << dendl;
     bufferlist bl_data;
     int r = store->read_obj_redirect(s->merge_ref, 
                                      &attrs, &lastmod, &total_len, 
@@ -1033,6 +1044,40 @@ void RGWGetObj::execute()
   if (ret < 0)
     goto done_err;
 
+
+  //begin added by guokexin 20160609
+  if(s->bucket_info.days != "-1") {
+    map<string, bufferlist>::iterator iter = attrs.find(RGW_ATTR_DELETE_AT);
+    if (iter == attrs.end()) {
+      //rgw_bucket bucket;
+      rgw_rados_ref ref;
+      librados::ObjectWriteOperation op;
+
+      delete_at = ceph_clock_now(0).sec() + atoi(s->bucket_info.days.c_str());
+      bufferlist delatbl;
+      ::encode(utime_t(delete_at, 0), delatbl);
+      op.setxattr(RGW_ATTR_DELETE_AT, delatbl);
+
+      int r = store->get_obj_ref(obj, &ref, &s->bucket);
+      r = ref.ioctx.operate(ref.oid, &op);
+      encode_delete_at_attr(delete_at,attrs);
+
+      //
+      if (delete_at > 0) {
+
+        rgw_obj_key obj_key;
+        obj.get_index_key(&obj_key);
+        ldout(s->cct , 20) << "objexp_hint_add" << dendl;
+        r = store->objexp_hint_add(utime_t(delete_at, 0), s->bucket.name, s->bucket.bucket_id, obj_key);
+        if (r < 0) {
+          ldout(s->cct, 0) << "ERROR: objexp_hint_add() returned r=" << r << ", object will not get removed" << dendl;
+        }
+      }
+    }
+  }
+  //end added
+
+
   attr_iter = attrs.find(RGW_ATTR_USER_MANIFEST);
   if (attr_iter != attrs.end()) {
     ret = handle_user_manifest(attr_iter->second.c_str());
@@ -1042,8 +1087,6 @@ void RGWGetObj::execute()
     return;
   }
 
-  /* Check whether the object has expired. Swift API documentation
-   * stands that we should return 404 Not Found in such case. */
   if (need_object_expiration() && object_is_expired(attrs)) {
     ret = -ENOENT;
     goto done_err;
@@ -1062,7 +1105,7 @@ void RGWGetObj::execute()
   ret = read_op.iterate(ofs, end, &cb);
 
   perfcounter->tinc(l_rgw_get_lat,
-                   (ceph_clock_now(s->cct) - start_time));
+      (ceph_clock_now(s->cct) - start_time));
   if (ret < 0) {
     goto done_err;
   }
@@ -1119,7 +1162,7 @@ void RGWListBuckets::execute()
       read_count = max_buckets;
 
     ret = rgw_read_user_buckets(store, s->user.user_id, buckets,
-                                marker, read_count, should_get_stats());
+        marker, read_count, should_get_stats());
 
     if (!started) {
       send_response_begin(buckets.count() > 0);
@@ -1243,6 +1286,105 @@ void RGWSetBucketVersioning::execute()
     return;
   }
 }
+
+
+
+//begin added by guokexin
+int RGWSetBucketLifeCycle::verify_permission()
+{
+  if (s->user.user_id.compare(s->bucket_owner.get_id()) != 0)
+    return -EACCES;
+
+  return 0;
+}
+
+void RGWSetBucketLifeCycle::pre_exec()
+{
+  rgw_bucket_object_pre_exec(s);
+}
+
+void RGWSetBucketLifeCycle::execute()
+{
+
+  ret = get_params();
+
+  if (ret < 0)
+    return;
+
+
+  if (enable_lifecycle) {
+    s->bucket_info.days = days;
+  }
+
+
+  ret = store->put_bucket_instance_info(s->bucket_info, false, 0, &s->bucket_attrs);
+  if (ret < 0) {
+    ldout(s->cct, 0) << "NOTICE: put_bucket_info on bucket=" << s->bucket.name << " returned err=" << ret << dendl;
+    return;
+  }
+}
+//end added
+//begin added by guokexin
+
+int RGWGetBucketLifeCycle::verify_permission()
+{
+  if (s->user.user_id.compare(s->bucket_owner.get_id()) != 0)
+    return -EACCES;
+
+  return 0;
+}
+
+void RGWGetBucketLifeCycle::pre_exec()
+{
+  rgw_bucket_object_pre_exec(s);
+}
+
+void RGWGetBucketLifeCycle::execute()
+{
+  days = s->bucket_info.days;
+  //versioned = s->bucket_info.versioned();
+  //versioning_enabled = s->bucket_info.versioning_enabled();
+}
+//end added
+
+
+
+
+
+//begin added by guokexin
+int RGWDelBucketLifeCycle::verify_permission()
+{
+  if (s->user.user_id.compare(s->bucket_owner.get_id()) != 0)
+    return -EACCES;
+
+  return 0;
+}
+
+void RGWDelBucketLifeCycle::pre_exec()
+{
+  rgw_bucket_object_pre_exec(s);
+}
+
+void RGWDelBucketLifeCycle::execute()
+{
+  if (ret < 0)
+    return;
+
+ 
+  s->bucket_info.days = "";
+  s->bucket_info.days = "-1"; 
+
+
+  ret = store->put_bucket_instance_info(s->bucket_info, false, 0, &s->bucket_attrs);
+  if (ret < 0) {
+    ldout(s->cct, 0) << "NOTICE: put_bucket_info on bucket=" << s->bucket.name << " returned err=" << ret << dendl;
+    return;
+  }
+}
+//end added
+
+
+
 
 int RGWStatBucket::verify_permission()
 {
@@ -1762,12 +1904,14 @@ RGWPutObjProcessor *RGWPutObj::select_processor(RGWObjectCtx& obj_ctx, bool *is_
   uint64_t part_size = s->cct->_conf->rgw_obj_stripe_size;
 
   if (!multipart) {
+    
     processor = new RGWPutObjProcessor_Atomic(obj_ctx, s->bucket_info, s->bucket, s->object.name, part_size, s->req_id, s->bucket_info.versioning_enabled());
     ((RGWPutObjProcessor_Atomic *)processor)->set_olh_epoch(olh_epoch);
     ((RGWPutObjProcessor_Atomic *)processor)->set_version_id(version_id);
     ((RGWPutObjProcessor_Atomic *)processor)->set_content_length(s->content_length);   //added by hechuang
     ((RGWPutObjProcessor_Atomic *)processor)->set_need_compress(s->bucket.compress);   //added by hechuang
-  } else {
+  } 
+  else {
     /* Begin added by hechuang */
     string meta_oid;
     rgw_obj meta_obj;
@@ -1833,6 +1977,7 @@ static int put_data_and_throttle(RGWPutObjProcessor *processor, bufferlist& data
 
   do {
     void *handle;
+
 
     int ret = processor->handle_data(data, ofs, hash, &handle, &again);
     if (ret < 0)
@@ -1911,6 +2056,16 @@ void RGWPutObj::execute()
   if (ret < 0)
     goto done;
 
+  //added by guokexin 20160609
+  ldout(s->cct , 20) << "Bucket_Info " << s->bucket_info.days << dendl;
+  if(s->bucket_info.days != "-1") {
+    time_t cur_time = ceph_clock_now(0).sec();
+    delete_at = cur_time + atoi(s->bucket_info.days.c_str());
+    ldout(s->cct , 20) << "cur_time "<< cur_time << dendl;
+    ldout(s->cct , 20) << "delete_at "<< delete_at << dendl;
+  }
+  //end added
+
   ret = get_system_versioning_params(s, &olh_epoch, &version_id);
   if (ret < 0) {
     goto done;
@@ -1946,6 +2101,7 @@ void RGWPutObj::execute()
     supplied_md5[sizeof(supplied_md5) - 1] = '\0';
   }
 
+  //=================================================================
   processor = select_processor(*(RGWObjectCtx *)s->obj_ctx, &multipart);
   /* Begin added by hechuang */
   if (NULL == processor) {
@@ -1954,6 +2110,7 @@ void RGWPutObj::execute()
   }
   /* End added */
   ret = processor->prepare(store, NULL);
+  
   if (ret < 0)
     goto done;
 
@@ -1970,6 +2127,7 @@ void RGWPutObj::execute()
     /* do we need this operation to be synchronous? if we're dealing with an object with immutable
      * head, e.g., multipart object we need to make sure we're the first one writing to this object
      */
+
     bool need_to_wait = (ofs == 0) && multipart;
 
     bufferlist orig_data;
@@ -2010,6 +2168,8 @@ void RGWPutObj::execute()
       if (ret < 0) {
         goto done;
       }
+    }
+    else {
     }
 
     ofs += len;
@@ -3022,6 +3182,7 @@ void RGWInitMultipart::execute()
 
     RGWRados::Object::Write obj_op(&op_target);
 
+    dout(0) << " RGWInitMultipart::execute() " << dendl;
     obj_op.meta.owner = s->owner.get_id();
     obj_op.meta.category = RGW_OBJ_CATEGORY_MULTIMETA;
     obj_op.meta.flags = PUT_OBJ_CREATE_EXCL;
@@ -3356,6 +3517,7 @@ void RGWCompleteMultipart::execute()
 
   obj_ctx.set_atomic(target_obj);
 
+  ldout(store->ctx() , 0) << " RGWCompleteMultipart::execute() " << dendl;
   RGWRados::Object op_target(store, s->bucket_info, *(RGWObjectCtx *)s->obj_ctx, target_obj);
   RGWRados::Object::Write obj_op(&op_target);
 

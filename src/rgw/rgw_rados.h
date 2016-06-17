@@ -1285,6 +1285,9 @@ class RGWRados
   friend class RGWObjectExpirer;
   friend class RGWStateLog;
   friend class RGWReplicaLogger;
+  //begin added by guokexin 20160609
+  friend class RGWGetObj;
+  //end added
 
   /** Open the pool used as root for this gateway */
   int open_root_pool_ctx();
@@ -1383,6 +1386,7 @@ class RGWRados
   uint32_t bucket_index_max_shards;
   //added by guokexin , add para 4,20160505
   int get_obj_ioctx(const rgw_obj& obj, librados::IoCtx *ioctx, int op_type = 0);
+
   int get_obj_ref(const rgw_obj& obj, rgw_rados_ref *ref, rgw_bucket *bucket, bool ref_system_obj = false);
   uint64_t max_bucket_id;
 
@@ -1397,6 +1401,7 @@ class RGWRados
 
   void remove_rgw_head_obj(librados::ObjectWriteOperation& op);
   void cls_obj_check_prefix_exist(librados::ObjectOperation& op, const string& prefix, bool fail_if_exist);
+
 protected:
   CephContext *cct;
 
