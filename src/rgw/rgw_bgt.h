@@ -1512,10 +1512,12 @@ class RGWBgtManager : public Thread {
 	  Mutex*  schedulers_data_lock;
     Mutex*  workers_data_lock;
     Mutex*  lock;
+    Mutex*  merger_speed_lock;
     time_t  pre_check_worker_time;
     time_t  pre_reload_scheduler_info_time;
     atomic64_t  archive_num;
     std::list<uint64_t>  archive_v_queue;
+    std::vector<uint64_t>  merger_v_ret;
     time_t pre_snap_v_time;
     
   //private:
@@ -1546,6 +1548,7 @@ class RGWBgtManager : public Thread {
     int reload_scheduler( );
     int reload_workers( );
     void snap_archive_v( );
+    void  gen_merger_speed(vector<uint64_t>& vec);
     //thread function implement
    public:
     void *entry();

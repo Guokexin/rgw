@@ -1906,8 +1906,9 @@ void RGWBgtScheduler::check_log_trans()
         //
         if ((0 == r) 
           && ((size > (m_cct->_conf->rgw_bgt_change_log_max_shard*sizeof(RGWChangeLogHdr)) && 1 == force_merge_all.read()) 
-          || ((size/= (1<<20)) >= m_cct->_conf->rgw_bgt_change_log_max_size))) 
+          //|| ((size/= (1<<20)) >= m_cct->_conf->rgw_bgt_change_log_max_size))) 
           //|| ((size/= (1<<10)) >= m_cct->_conf->rgw_bgt_change_log_max_size))) 
+          || ((size) >= m_cct->_conf->rgw_bgt_change_log_max_size * 80)))  //80 is size of logentry 
         {
           ldout(m_cct , 5) << "RGW_BGT_TRANS_START  "<< "size  " << size << dendl;
           log_trans_info.stage = RGW_BGT_LOG_TRANS_START;
@@ -3777,6 +3778,7 @@ int RGWBgtManager::init(RGWRados* _store, CephContext* _cct) {
   schedulers_data_lock = new Mutex(rgw_unique_lock_name(string("RGWBgtManager::schedulers_data_lock")+rgw_name, this), false, true, false, m_cct);
   workers_data_lock = new Mutex(rgw_unique_lock_name(string("RGWBgtManager::workers_data_lock")+rgw_name, this), false, true, false, m_cct);
   lock = new Mutex(rgw_unique_lock_name(string("RGWBgtManager::lock")+rgw_name,this),false,true,false,m_cct);
+  merger_speed_lock = new Mutex(rgw_unique_lock_name(string("RGWBgtManager::merger_speed_lock")+rgw_name,this),false,true,false,m_cct);
 
   m_manager_inst_name = RGW_BGT_MANAGER_INST ;//+ std::string("_") + m_cct->_conf->name.to_str();
   m_merger_inst_name = RGW_BGT_MANAGER_MERGER_PREFIX + m_cct->_conf->name.to_str();
@@ -4203,21 +4205,35 @@ void RGWBgtManager::check_workers( ) {
 //snap scheduler v
 void RGWBgtManager::snap_archive_v( ) {
 
-  //uint64_t num = (uint64_t)archive_num.read();
   int size = archive_v_queue.size();
   if(size >= 11) {
      archive_v_queue.pop_front();
   }
-  else {
-    ldout(m_cct , 0) << " snap merger v "<< archive_num.read() << dendl;
-    archive_v_queue.push_back( archive_num.read());
-  }
+  
+  
+  uint64_t num = archive_num.read();
+  ldout(m_cct , 0) << " snap merger v "<< num << dendl;
+  archive_v_queue.push_back(num);
+  
   //
   std::list<uint64_t>::iterator it ;
   
+  int i = 0;
+  merger_v_ret.clear();
+  merger_v_ret = vector<uint64_t>(11 , 0);
   for(it = archive_v_queue.begin(); it != archive_v_queue.end(); it++ ) {
-    ldout(m_cct , 5) << "merger v === " << (*it) << dendl;
+    ldout(m_cct , 0) << "merger v === " << (*it) << dendl;
+    merger_v_ret[i] = *it;
+    i++;
   }
+}
+//gen merger speed
+void RGWBgtManager::gen_merger_speed(vector<uint64_t>& vec) {
+
+  vec = merger_v_ret;
+//  merger_speed_lock.Lock();
+
+//  merger_speed_lock.UnLock();
 }
 
 void* RGWBgtManager::entry() {

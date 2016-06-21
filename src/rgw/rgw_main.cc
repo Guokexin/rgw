@@ -544,7 +544,7 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
 
   dout(1) << "====== starting new request req=" << hex << req << dec << " =====" << dendl;
   perfcounter->inc(l_rgw_req);
-  //dout(0) << "perfcounter req counter " << perfcounter->get(l_rgw_req) << dendl;
+  dout(1) << "perfcounter req counter " << perfcounter->get(l_rgw_req) << dendl;
 
   RGWEnv& rgw_env = client_io->get_env();
 
@@ -581,7 +581,7 @@ static int process_request(RGWRados *store, RGWREST *rest, RGWRequest *req, RGWC
   }
 
 
-  //dout(0) << "op = " << typeid(*op).name() << dendl;
+  dout(1) << "op = " << typeid(*op).name() << dendl;
 
   req->op = op;
 

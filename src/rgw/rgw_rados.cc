@@ -1467,7 +1467,7 @@ RGWRados::CommandHook::CommandHook(RGWRados *rados) :
 bool RGWRados::CommandHook::call(std::string command, cmdmap_t& cmdmap,
 			       std::string format, bufferlist& out)
 {
-  std::cout << "xxx "<<command.c_str() << std::endl;
+  //std::cout << "xxx "<<command.c_str() << std::endl;
   Formatter *f = Formatter::create(format);
   f->open_object_section("result");
   m_rados->lock.Lock();
@@ -1493,6 +1493,21 @@ bool RGWRados::CommandHook::call(std::string command, cmdmap_t& cmdmap,
              f->dump_string("create scheduler",var);
         }
      }
+  }
+  else if (command == "query_speed") {
+    ldout(m_rados->cct , 0) << "query speed" << dendl; 
+    /*
+     *
+     **/
+    vector<uint64_t>  vec;
+    RGWBgtManager* manager = RGWBgtManager::instance();
+    if(manager) {
+      manager->gen_merger_speed(vec);
+      int size = vec.size();
+      for(int i=0; i<size; i++) {
+         f->dump_unsigned("v",vec[i]);
+      }
+    }
   }
   else if (command == "req_stat_dump")
   {
@@ -2365,6 +2380,21 @@ int RGWRados::init_admin_socket()
     lderr(cct) << "error registering admin socket command: " 
       << cpp_strerror(-ret) << dendl;
   }
+
+  /*begin add by guokexin 20160620*/
+  ret = admin_socket->register_command("query_speed",
+      "query_speed",
+      &m_command_hook,
+      "query merger speed");
+  if (ret < 0) 
+  {
+    lderr(cct) << "error registering admin scoket  command query_speed: "
+      << cpp_strerror(-ret) << dendl;
+  }
+  /*end add*/
+
+
+
   /* Begin added by hechuang */
   ret = admin_socket->register_command("reload_storage_policy",
       "reload_storage_policy",
@@ -7304,13 +7334,16 @@ struct get_obj_data : public RefCountedObject {
   /*Begin added by guokexin*/
   atomic_t io_sent_finish;
   /*End added*/  
+  //Beging added by guokexin 
+  int type;
+  //End added
 
   get_obj_data(CephContext *_cct)
     : cct(_cct),
       rados(NULL), ctx(NULL),compressed(false),    //compressed is added by hechuang
       total_read(0), lock("get_obj_data"), data_lock("get_obj_data::data_lock"),
       client_cb(NULL),
-      throttle(cct, "get_obj_data", cct->_conf->rgw_get_obj_window_size, false) {}
+      throttle(cct, "get_obj_data", cct->_conf->rgw_get_obj_window_size, false), type(0) {}
   virtual ~get_obj_data() { } 
   void set_cancelled(int r) {
     cancelled.set(1);
@@ -7665,7 +7698,9 @@ void RGWRados::get_obj_aio_completion_cb(completion_t c, void *arg)
   d->throttle.put(len);
 
   /*Begin modified by lujiafu*/
-  if (typeid(*(d->client_cb)) != typeid(RGWArchiveOp_CB))
+  //if (typeid(*(d->client_cb)) != typeid(RGWArchiveOp_CB))
+  //Begin added by guokexin
+  if(1 != d->type)
   {
     r = rados_aio_get_return_value(c);
     if (r < 0) {
@@ -8055,6 +8090,9 @@ int RGWRados::Object::Read::iterate_archive(int64_t ofs, int64_t end, RGWGetData
   data->io_ctx.dup(state.io_ctx);
   data->client_cb = cb;
   data->io_sent_finish.set(0);
+  //Begin added by guokexin  20160621
+  data->type = 1;
+  //End added 
   int r = store->iterate_obj_archive(obj_ctx, state.obj, ofs, end, cct->_conf->rgw_get_obj_max_req_size, _get_obj_iterate_cb_archive, (void *)data);
   if (r < 0) {
     data->cancel_all_io();
