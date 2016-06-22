@@ -1529,6 +1529,8 @@ class RGWBgtManager : public Thread {
     RGWBgtScheduler* get_adapter_scheduler_from_name(std::string& scheduler_name);
     //product a scheduler instance, succ return 0 , fail return -1
     int gen_scheduler_instance(std::string& hot_pool, std::string& cold_pool, std::string& scheduler_name);
+    //product a scheduler instance, succ return 0 , fail return -1
+    int update_scheduler_instance(std::string& hot_pool, std::string& cold_pool, std::string& scheduler_name);
     //get a worker instance pointer according to para1 (merger_name)
     RGWBgtWorker* get_adapter_merger(std::string& merge_name);
     

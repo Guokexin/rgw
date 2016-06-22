@@ -1472,7 +1472,6 @@ bool RGWRados::CommandHook::call(std::string command, cmdmap_t& cmdmap,
   f->open_object_section("result");
   m_rados->lock.Lock();
 
-
   //Begin added by guokexin
   if (command == "scheduler create") {
       std::string var;
@@ -1487,13 +1486,36 @@ bool RGWRados::CommandHook::call(std::string command, cmdmap_t& cmdmap,
           if( manager ) {
              ldout(m_rados->cct , 0) << "hot_pool " <<var << "cold_pool "<<val[0] << dendl; 
              std::string name = "";
-             manager->gen_scheduler_instance(var,val[0], name);
+             int nRet = manager->gen_scheduler_instance(var,val[0], name);
              
-             std::string ss("create scheduler"); 
-             f->dump_string("create scheduler",var);
+             f->open_object_section("scheduler create");
+             f->dump_int("result",nRet); // 0 succ , others fail
+             f->close_section();
         }
      }
   }
+  else if (command == "scheduler update") {
+      std::string var;
+      std::vector<std::string> val;
+
+      if (!(cmd_getval(m_rados->cct, cmdmap, "var", var)) ||
+          !(cmd_getval(m_rados->cct, cmdmap, "val", val))) {
+        f->dump_string("error", "syntax error: 'scheduler update <var> <value>'");
+      } 
+      else {
+          RGWBgtManager* manager = RGWBgtManager::instance();
+          if( manager ) {
+             ldout(m_rados->cct , 0) << "hot_pool " <<var << "cold_pool "<<val[0] << dendl; 
+             std::string name = "";
+             int nRet = manager->update_scheduler_instance(var,val[0], name);
+             f->open_object_section("scheduler update"); 
+             f->dump_int("result",nRet);
+             f->close_section();
+        }
+     }
+  }
+ 
+
   else if (command == "query_speed") {
     ldout(m_rados->cct , 0) << "query speed" << dendl; 
     /*
@@ -1504,9 +1526,12 @@ bool RGWRados::CommandHook::call(std::string command, cmdmap_t& cmdmap,
     if(manager) {
       manager->gen_merger_speed(vec);
       int size = vec.size();
+      f->open_object_section("result");
       for(int i=0; i<size; i++) {
+
          f->dump_unsigned("v",vec[i]);
       }
+      f->close_section();
     }
   }
   else if (command == "req_stat_dump")
@@ -2380,6 +2405,16 @@ int RGWRados::init_admin_socket()
     lderr(cct) << "error registering admin socket command: " 
       << cpp_strerror(-ret) << dendl;
   }
+
+  ret = admin_socket->register_command("scheduler update", "scheduler update name=var,type=CephString name=val,type=CephString,n=N",  &m_command_hook, "scheduler update <field> <val> [<val> ...]: set a config variable");
+
+  if(ret < 0) {
+    lderr(cct) << "error registering admin socket command: " 
+      << cpp_strerror(-ret) << dendl;
+  }
+
+
+
 
   /*begin add by guokexin 20160620*/
   ret = admin_socket->register_command("query_speed",
