@@ -2297,14 +2297,14 @@ RGWBgtScheduler::RGWBgtScheduler(RGWRados* _store, CephContext* _cct, std::strin
                                        m_cct(_cct),
                                        stopping(true),
                                        wait_task_finish(false),
-                                       lock(rgw_unique_lock_name("RGWBgtScheduler::lock" + m_cct->_conf->name.to_str(), this), false, true, false, _cct),
-                                       worker_data_lock(rgw_unique_lock_name("RGWBgtScheduler::worker_data_lock"  + m_cct->_conf->name.to_str(), this), false, true, false, _cct),
-                                       active_change_log_lock(rgw_unique_lock_name("RGWBgtScheduler::active_change_log_lock" + m_cct->_conf->name.to_str(), this)), 
+                                       lock(rgw_unique_lock_name("RGWBgtScheduler::lock" + m_cct->_conf->name.to_str()+ _hot_pool, this), false, true, false, _cct),
+                                       worker_data_lock(rgw_unique_lock_name("RGWBgtScheduler::worker_data_lock"  + m_cct->_conf->name.to_str() + _hot_pool, this), false, true, false, _cct),
+                                       active_change_log_lock(rgw_unique_lock_name("RGWBgtScheduler::active_change_log_lock" + m_cct->_conf->name.to_str() + _hot_pool, this)), 
                                        max_log_id(0), 
                                        active_change_log(""),
                                        hot_pool(_hot_pool),
                                        cold_pool(_cold_pool),
-                                       update_change_log_lock(rgw_unique_lock_name("RGWBgtWorker::update_lock" + m_cct->_conf->name.to_str(), this)),
+                                       update_change_log_lock(rgw_unique_lock_name("RGWBgtScheduler::update_lock" + m_cct->_conf->name.to_str() + _hot_pool, this)),
                                        change_log_num(0)
 {
 

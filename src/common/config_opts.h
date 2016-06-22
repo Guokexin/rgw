@@ -1117,13 +1117,13 @@ OPTION(rgw_primary_pool,OPT_STR,"ssd_pool") //set the system pool, it must be ex
 /* End added */
 
 //begein added by guokexin
-OPTION(rgw_merger_speed_sample_frequency, OPT_U32, 60) // role type: scheduler(2), worker(4), merger(8)
-OPTION(rgw_merger_speed_sample_window_size, OPT_U32, 10) // set the background task pool
-OPTION(rgw_merger_max_threads, OPT_U32, 50) // set the background task pool
-OPTION(rgw_batch_task_num, OPT_U32, 1) // set the background task pool
-OPTION(rgw_merger_max_idle_time, OPT_U32, 3600) // set the background task pool
-OPTION(rgw_reload_scheduler_time, OPT_U32, 60) // set the background task pool
-//end
+OPTION(rgw_merger_speed_sample_frequency, OPT_U32, 60)
+OPTION(rgw_merger_speed_sample_window_size, OPT_U32, 10) 
+OPTION(rgw_merger_max_threads, OPT_U32, 50) 
+OPTION(rgw_batch_task_num, OPT_U32, 1) 
+OPTION(rgw_merger_max_idle_time, OPT_U32, 3600) 
+OPTION(rgw_reload_scheduler_time, OPT_U32, 60) 
+//end added
 
 OPTION(rgw_objexp_gc_interval, OPT_U32, 60 * 10) // maximum time between round of expired objects garbage collecting
 OPTION(rgw_objexp_time_step, OPT_U32, 4096) // number of seconds for rounding the timestamps
